@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>Dolittle.TimeSeries.MQTTBridge</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dolittle.SDK.Clients" Version="3.*" />
+    <PackageReference Include="Dolittle.TimeSeries.Runtime.DataPoints.Grpc" Version="1.*" />
+    <PackageReference Include="MQTTnet" Version="3.0.8" />
+  </ItemGroup>
+
+</Project>
