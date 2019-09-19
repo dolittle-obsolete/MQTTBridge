@@ -7,56 +7,46 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Dolittle.Logging;
-using Dolittle.Serialization.Json;
 using protobuf = Dolittle.TimeSeries.DataTypes.Protobuf;
 using Grpc.Core;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Client.Options;
 using static Dolittle.TimeSeries.Runtime.DataPoints.Grpc.Server.InputStream;
-using Dolittle.Protobuf;
-using Dolittle.TimeSeries.DataTypes;
 using Newtonsoft.Json;
 
 namespace Dolittle.TimeSeries.MQTTBridge
 {
     /// <summary>
-    /// 
+    /// Represents the handler for input from MQTT
     /// </summary>
     public class Input
     {
-        readonly Channel _channel;
         readonly ILogger _logger;
         readonly Configuration _configuration;
-        private readonly ISerializer _serializer;
 
         /// <summary>
-        /// 
+        /// Initializes a new instance of <see cref="Input"/>
         /// </summary>
-        /// <param name="channel"></param>
-        /// <param name="configuration"></param>
-        /// <param name="serializer"></param>
-        /// <param name="logger"></param>
+        /// <param name="configuration"><see cref="Configuration"/> to use</param>
+        /// <param name="logger"><see cref="ILogger"/> for logging</param>
         public Input(
-            Channel channel,
             Configuration configuration,
-            ISerializer serializer,
             ILogger logger)
         {
             _logger = logger;
-            _channel = channel;
             _configuration = configuration;
-            _serializer = serializer;
         }
 
         /// <summary>
-        /// 
+        /// Start the input - consuming and processing messages from MQTT
         /// </summary>
         public void Start()
         {
             Task.Run(async() =>
             {
-                var streamClient = new InputStreamClient(_channel);
+                var channel = new Channel(_configuration.RuntimeEndpoint, ChannelCredentials.Insecure);
+                var streamClient = new InputStreamClient(channel);
                 var inputStream = streamClient.Open();
 
                 var optionsBuilder = new MqttClientOptionsBuilder()
@@ -71,66 +61,64 @@ namespace Dolittle.TimeSeries.MQTTBridge
                 var factory = new MqttFactory();
 
                 var mqttClient = factory.CreateMqttClient();
-                mqttClient.UseDisconnectedHandler(async e =>
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(5));
-                    try
-                    {
-                        await mqttClient.ConnectAsync(options, CancellationToken.None);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error(ex, "Couldn't reconnect MQTT client");
-                    }
-                });
-                mqttClient.UseConnectedHandler(async e =>
-                {
-                    _logger.Information($"Connected to MQTT broker");
-                    await mqttClient.SubscribeAsync(new TopicFilterBuilder().WithTopic("#").Build());
+                await HandleMQTTConnection(options, mqttClient);
 
-                });
-                _logger.Information($"Connect to MQTT broker");
-                await mqttClient.ConnectAsync(options, CancellationToken.None);
-
-                mqttClient.UseApplicationMessageReceivedHandler(async e =>
-                {
-
-                    try
-                    { 
-                        protobuf.DataPoint dataPoint;
-
-                        if (((char) e.ApplicationMessage.Payload[0]) == '{')
-                        {
-                            var json = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
-                            _logger.Information($"Handle message '{json}'");
-
-                            dynamic dynamicDP = JsonConvert.DeserializeObject<dynamic>(json);
-                            dataPoint = new protobuf.DataPoint();
-                            var timeSeriesId = (TimeSeriesId)Guid.Parse(dynamicDP.timeSeries.ToString());
-                            dataPoint.TimeSeries = timeSeriesId.ToProtobuf();
-                            dataPoint.Value = new protobuf.Value
-                            {
-                                MeasurementValue = new protobuf.Measurement
-                                {
-                                    FloatValue = dynamicDP.value.value,
-                                    FloatError = dynamicDP.value.error
-                                }
-                            };
-                            dataPoint.Timestamp = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(DateTimeOffset.Parse(dynamicDP.timestamp.ToString()));
-                        }
-                        else
-                        {
-                            dataPoint = new protobuf.DataPoint();
-                        }
-
-                        await inputStream.RequestStream.WriteAsync(dataPoint);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.Error(ex, $"Error handling received message - topic '{e.ApplicationMessage.Topic}' from client '{e.ClientId}'");
-                    }
-                });
+                mqttClient.UseApplicationMessageReceivedHandler(async e => await ProcessMessage(e, inputStream));
             });
+        }
+
+        async Task ProcessMessage(MqttApplicationMessageReceivedEventArgs e, AsyncDuplexStreamingCall<protobuf.DataPoint, Runtime.DataPoints.Grpc.Server.TimeSerie> inputStream)
+        {
+            try
+            {
+                protobuf.DataPoint dataPoint;
+                _logger.Information($"Message received on '{e.ApplicationMessage.Topic}' from client '{e.ClientId}' ");
+
+                if (((char)e.ApplicationMessage.Payload[0]) == '{')
+                {
+                    var json = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
+                    _logger.Information($"Handle as JSON : '{json}'");
+                    dataPoint = JsonConvert.DeserializeObject<protobuf.DataPoint>(json,
+                        new ProtobufGuidConverter(),
+                        new ProtobufTimestampConverter()
+                    );
+                }
+                else
+                {
+                    dataPoint = protobuf.DataPoint.Parser.ParseFrom(e.ApplicationMessage.Payload);
+                }
+
+                await inputStream.RequestStream.WriteAsync(dataPoint);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, $"Error handling received message - topic '{e.ApplicationMessage.Topic}' from client '{e.ClientId}'");
+            }
+        }
+
+        async Task HandleMQTTConnection(IMqttClientOptions options, IMqttClient mqttClient)
+        {
+            mqttClient.UseDisconnectedHandler(async e =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                try
+                {
+                    await mqttClient.ConnectAsync(options, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error(ex, "Couldn't reconnect MQTT client");
+                }
+            });
+            mqttClient.UseConnectedHandler(async e =>
+            {
+                _logger.Information($"Connected to MQTT broker");
+                var wildcard = _configuration.InputTopicPrefix.Wildcard;
+                _logger.Information($"Subscribe to '{wildcard}'");
+                await mqttClient.SubscribeAsync(new TopicFilterBuilder().WithTopic(wildcard).Build());
+            });
+            _logger.Information($"Connect to MQTT broker");
+            await mqttClient.ConnectAsync(options, CancellationToken.None);
         }
     }
 }

@@ -1,0 +1,10 @@
+{
+    "timeSeries": "a42b8b65-74ff-45fd-b434-2fb2a76e830d",
+    "value": {
+        "measurementValue": {
+            "floatValue": 1.32,
+            "floatError": 0.23
+        }
+    },
+    "timestamp": "2019-09-19T06:08:34+00:00"
+}

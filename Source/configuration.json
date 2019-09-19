@@ -4,5 +4,9 @@
         "port": 1883,
         "useTls": false,
         "clientId": ""
-    }
+    },
+    "runtimeEndpoint": "localhost:50052",
+    "inputTopicPrefix": "",
+    "outputTopicPrefix": "",
+    "outputAdditionalJSON" : true
 }
