@@ -60,3 +60,14 @@ To learn more about the projects of Dolittle and how to contribute, please go [h
 Go to our [documentation site](http://www.dolittle.io) and learn more about the project and how to get started.
 Samples can also be found [here](https://github.com/Dolittle-Samples).
 You can find entropy projects [here](https://github.com/Dolittle-Entropy).
+
+## MQTT Broker
+
+If you need to run a MQTT broker for testing, we recommend using something like
+[Eclipse Mosquitto](https://docs.docker.com/samples/library/eclipse-mosquitto/)
+
+For development purposes, the simplest thing you can do is to run the following:
+
+```shell
+$ docker run -it -p 1883:1883 -p 9001:9001 eclipse-mosquitto
+```

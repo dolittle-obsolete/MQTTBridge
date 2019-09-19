@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <Import Project="../Build/MSBuild/default.props" />
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,7 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    
     <PackageReference Include="Dolittle.SDK.Clients" Version="3.*" />
+    <PackageReference Include="Dolittle.Concepts.Serialization.Json" Version="3.*" />
+    <PackageReference Include="Dolittle.TimeSeries" Version="1.*" />
+    <PackageReference Include="Dolittle.TimeSeries.DataTypes" Version="1.*" />
     <PackageReference Include="Dolittle.TimeSeries.Runtime.DataPoints.Grpc" Version="1.*" />
     <PackageReference Include="MQTTnet" Version="3.0.8" />
   </ItemGroup>
