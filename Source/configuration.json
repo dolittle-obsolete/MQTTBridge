@@ -1,5 +1,5 @@
 {
-    "MQTT": {
+    "connection": {
         "host": "localhost",
         "port": 1883,
         "useTls": false,

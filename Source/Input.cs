@@ -60,10 +60,10 @@ namespace Dolittle.TimeSeries.MQTTBridge
                 var inputStream = streamClient.Open();
 
                 var optionsBuilder = new MqttClientOptionsBuilder()
-                    .WithClientId(_configuration.MQTT.ClientId)
-                    .WithTcpServer(_configuration.MQTT.Host, _configuration.MQTT.Port);
+                    .WithClientId(_configuration.Connection.ClientId)
+                    .WithTcpServer(_configuration.Connection.Host, _configuration.Connection.Port);
 
-                if (_configuration.MQTT.UseTls) optionsBuilder = optionsBuilder.WithTls();
+                if (_configuration.Connection.UseTls) optionsBuilder = optionsBuilder.WithTls();
 
                 var options = optionsBuilder.Build();
 

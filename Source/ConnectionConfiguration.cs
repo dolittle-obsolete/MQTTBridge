@@ -10,16 +10,16 @@ namespace Dolittle.TimeSeries.MQTTBridge
     /// <summary>
     /// Represents the settings for MQTT
     /// </summary>
-    public class MQTTSettings : IConfigurationObject
+    public class ConnectionConfiguration : IConfigurationObject
     {
         /// <summary>
-        /// Initializes a new instance of <see cref="MQTTSettings"/>
+        /// Initializes a new instance of <see cref="ConnectionConfiguration"/>
         /// </summary>
         /// <param name="host">Host MQTT broker to connect to</param>
         /// <param name="port">Port of the MQTT broker to connect to</param>
         /// <param name="useTls">Whether or not to use Tls</param>
         /// <param name="clientId">Unique client identifier - can be empty, which would lead to a random id</param>
-        public MQTTSettings(
+        public ConnectionConfiguration(
             string host,
             int port,
             bool useTls,

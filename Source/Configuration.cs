@@ -15,17 +15,17 @@ namespace Dolittle.TimeSeries.MQTTBridge
         /// <summary>
         /// Initializes a new instance of <see cref="Configuration"/>
         /// </summary>
-        /// <param name="mQTT"><see cref="MQTTSettings"/></param>
-        public Configuration(MQTTSettings mQTT)
+        /// <param name="connection"><see cref="ConnectionConfiguration"/></param>
+        public Configuration(ConnectionConfiguration connection)
         {
-            MQTT = mQTT;
+            Connection = connection;
         }
 
 
         /// <summary>
-        /// Gets the <see cref="MQTTSettings"/>
+        /// Gets the <see cref="ConnectionConfiguration"/>
         /// </summary>
-        public MQTTSettings MQTT {  get; }
+        public ConnectionConfiguration Connection {  get; }
 
     }
 }
