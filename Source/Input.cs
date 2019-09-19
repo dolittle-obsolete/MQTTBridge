@@ -4,19 +4,18 @@
  *--------------------------------------------------------------------------------------------*/
 using System;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Dolittle.Logging;
 using protobuf = Dolittle.TimeSeries.DataTypes.Protobuf;
 using Grpc.Core;
 using MQTTnet;
 using MQTTnet.Client;
-using MQTTnet.Client.Options;
 using static Dolittle.TimeSeries.Runtime.DataPoints.Grpc.Server.InputStream;
 using Newtonsoft.Json;
 
 namespace Dolittle.TimeSeries.MQTTBridge
 {
+
     /// <summary>
     /// Represents the handler for input from MQTT
     /// </summary>
@@ -24,46 +23,43 @@ namespace Dolittle.TimeSeries.MQTTBridge
     {
         readonly ILogger _logger;
         readonly Configuration _configuration;
+        readonly IMqttClient _mqttClient;
 
         /// <summary>
         /// Initializes a new instance of <see cref="Input"/>
         /// </summary>
         /// <param name="configuration"><see cref="Configuration"/> to use</param>
+        /// <param name="mqttClient"><see cref="IMqttClient"/> to use</param>
         /// <param name="logger"><see cref="ILogger"/> for logging</param>
         public Input(
             Configuration configuration,
+            IMqttClient mqttClient,
             ILogger logger)
         {
             _logger = logger;
             _configuration = configuration;
+            _mqttClient = mqttClient;
         }
 
         /// <summary>
-        /// Start the input - consuming and processing messages from MQTT
+        /// Start the input - consuming and processing messages from MQTT and send to input stream on runtime
         /// </summary>
         public void Start()
         {
-            Task.Run(async() =>
+            Task.Run(() =>
             {
                 var channel = new Channel(_configuration.RuntimeEndpoint, ChannelCredentials.Insecure);
                 var streamClient = new InputStreamClient(channel);
                 var inputStream = streamClient.Open();
 
-                var optionsBuilder = new MqttClientOptionsBuilder()
-                    .WithClientId(_configuration.Connection.ClientId)
-                    .WithTcpServer(_configuration.Connection.Host, _configuration.Connection.Port);
-
-                if (_configuration.Connection.UseTls) optionsBuilder = optionsBuilder.WithTls();
-
-                var options = optionsBuilder.Build();
-
-                _logger.Information($"Creating MQTT Client");
-                var factory = new MqttFactory();
-
-                var mqttClient = factory.CreateMqttClient();
-                await HandleMQTTConnection(options, mqttClient);
-
-                mqttClient.UseApplicationMessageReceivedHandler(async e => await ProcessMessage(e, inputStream));
+                _mqttClient.UseConnectedHandler(async e =>
+                {
+                    _logger.Information($"Connected to MQTT broker");
+                    var wildcard = _configuration.InputTopicPrefix.Wildcard;
+                    _logger.Information($"Subscribe to '{wildcard}'");
+                    await _mqttClient.SubscribeAsync(new TopicFilterBuilder().WithTopic(wildcard).Build());
+                });
+                _mqttClient.UseApplicationMessageReceivedHandler(async e => await ProcessMessage(e, inputStream));
             });
         }
 
@@ -94,31 +90,6 @@ namespace Dolittle.TimeSeries.MQTTBridge
             {
                 _logger.Error(ex, $"Error handling received message - topic '{e.ApplicationMessage.Topic}' from client '{e.ClientId}'");
             }
-        }
-
-        async Task HandleMQTTConnection(IMqttClientOptions options, IMqttClient mqttClient)
-        {
-            mqttClient.UseDisconnectedHandler(async e =>
-            {
-                await Task.Delay(TimeSpan.FromSeconds(5));
-                try
-                {
-                    await mqttClient.ConnectAsync(options, CancellationToken.None);
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error(ex, "Couldn't reconnect MQTT client");
-                }
-            });
-            mqttClient.UseConnectedHandler(async e =>
-            {
-                _logger.Information($"Connected to MQTT broker");
-                var wildcard = _configuration.InputTopicPrefix.Wildcard;
-                _logger.Information($"Subscribe to '{wildcard}'");
-                await mqttClient.SubscribeAsync(new TopicFilterBuilder().WithTopic(wildcard).Build());
-            });
-            _logger.Information($"Connect to MQTT broker");
-            await mqttClient.ConnectAsync(options, CancellationToken.None);
         }
     }
 }
