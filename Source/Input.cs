@@ -12,6 +12,8 @@ using MQTTnet;
 using MQTTnet.Client;
 using static Dolittle.TimeSeries.Runtime.DataPoints.Grpc.Server.InputStream;
 using Newtonsoft.Json;
+using System.Threading;
+using MQTTnet.Client.Options;
 
 namespace Dolittle.TimeSeries.MQTTBridge
 {
@@ -24,21 +26,25 @@ namespace Dolittle.TimeSeries.MQTTBridge
         readonly ILogger _logger;
         readonly Configuration _configuration;
         readonly IMqttClient _mqttClient;
+        readonly IMqttClientOptions _mqttClientOptions;
 
         /// <summary>
         /// Initializes a new instance of <see cref="Input"/>
         /// </summary>
         /// <param name="configuration"><see cref="Configuration"/> to use</param>
         /// <param name="mqttClient"><see cref="IMqttClient"/> to use</param>
+        /// <param name="mqttClientOptions"><see cref="IMqttClientOptions"/> to use</param>
         /// <param name="logger"><see cref="ILogger"/> for logging</param>
         public Input(
             Configuration configuration,
             IMqttClient mqttClient,
+            IMqttClientOptions mqttClientOptions,
             ILogger logger)
         {
             _logger = logger;
             _configuration = configuration;
             _mqttClient = mqttClient;
+            _mqttClientOptions = mqttClientOptions;
         }
 
         /// <summary>
@@ -46,7 +52,7 @@ namespace Dolittle.TimeSeries.MQTTBridge
         /// </summary>
         public void Start()
         {
-            Task.Run(() =>
+            Task.Run(async () =>
             {
                 var channel = new Channel(_configuration.RuntimeEndpoint, ChannelCredentials.Insecure);
                 var streamClient = new InputStreamClient(channel);
@@ -60,6 +66,8 @@ namespace Dolittle.TimeSeries.MQTTBridge
                     await _mqttClient.SubscribeAsync(new TopicFilterBuilder().WithTopic(wildcard).Build());
                 });
                 _mqttClient.UseApplicationMessageReceivedHandler(async e => await ProcessMessage(e, inputStream));
+
+                await _mqttClient.ConnectAsync(_mqttClientOptions, CancellationToken.None);
             });
         }
 

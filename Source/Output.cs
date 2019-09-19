@@ -14,6 +14,8 @@ using Newtonsoft.Json;
 using Dolittle.Protobuf;
 using Google.Protobuf;
 using System.IO;
+using System.Threading;
+using MQTTnet.Client.Options;
 
 namespace Dolittle.TimeSeries.MQTTBridge
 {
@@ -24,22 +26,26 @@ namespace Dolittle.TimeSeries.MQTTBridge
     {
         readonly ILogger _logger;
         readonly Configuration _configuration;
-        private readonly IMqttClient _mqttClient;
+        readonly IMqttClient _mqttClient;
+        readonly IMqttClientOptions _mqttClientOptions;
 
         /// <summary>
         /// Initializes a new instance of <see cref="Output"/>
         /// </summary>
         /// <param name="configuration"><see cref="Configuration"/> to use</param>
         /// <param name="mqttClient"><see cref="IMqttClient"/> to use</param>
+        /// <param name="mqttClientOptions"><see cref="IMqttClientOptions"/> to use</param>
         /// <param name="logger"><see cref="ILogger"/> for logging</param>
         public Output(
             Configuration configuration,
             IMqttClient mqttClient,
+            IMqttClientOptions mqttClientOptions,
             ILogger logger)
         {
             _logger = logger;
             _configuration = configuration;
             _mqttClient = mqttClient;
+            _mqttClientOptions = mqttClientOptions;
         }
 
         /// <summary>
@@ -49,6 +55,8 @@ namespace Dolittle.TimeSeries.MQTTBridge
         {
             Task.Run(async() =>
             {
+                await _mqttClient.ConnectAsync(_mqttClientOptions, CancellationToken.None);
+
                 var channel = new Channel(_configuration.RuntimeEndpoint, ChannelCredentials.Insecure);
                 var client = new OutputStreamClient(channel);
                 var stream = client.Open(new Empty());

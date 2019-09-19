@@ -36,8 +36,10 @@ namespace Dolittle.TimeSeries.MQTTBridge
         public void Provide(IBindingProviderBuilder builder)
         {
             builder.Bind<IMqttClient>().To(ProvideMQTTClient);
+            builder.Bind<IMqttClientOptions>().To(() => _mqttOptions);
         }
 
+        static IMqttClientOptions _mqttOptions;
 
         IMqttClient ProvideMQTTClient() 
         {
@@ -52,6 +54,7 @@ namespace Dolittle.TimeSeries.MQTTBridge
             if (configuration.Connection.UseTls) optionsBuilder = optionsBuilder.WithTls();
 
             var options = optionsBuilder.Build();
+            _mqttOptions = options;
 
             var factory = new MqttFactory();
 
@@ -70,7 +73,6 @@ namespace Dolittle.TimeSeries.MQTTBridge
                 }
             });
             _logger.Information($"Connect to MQTT broker");
-            mqttClient.ConnectAsync(options, CancellationToken.None);
 
             return mqttClient;
         }
