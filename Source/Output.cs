@@ -7,15 +7,15 @@ using Dolittle.Logging;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using static Dolittle.TimeSeries.Runtime.DataPoints.Grpc.Server.OutputStream;
+using System.IO;
 using System.Text;
-using MQTTnet;
-using MQTTnet.Client;
-using Newtonsoft.Json;
+using System.Threading;
 using Dolittle.Protobuf;
 using Google.Protobuf;
-using System.IO;
-using System.Threading;
+using MQTTnet;
+using MQTTnet.Client;
 using MQTTnet.Client.Options;
+using Newtonsoft.Json;
 
 namespace Dolittle.TimeSeries.MQTTBridge
 {
@@ -70,21 +70,23 @@ namespace Dolittle.TimeSeries.MQTTBridge
                     dataPoint.WriteTo(outputStream);
 
                     var topic = $"{_configuration.OutputTopicPrefix}/{timeSeriesId}";
-                        await _mqttClient.PublishAsync(new MqttApplicationMessage 
-                        {
-                            Topic = topic,
+                    await _mqttClient.PublishAsync(new MqttApplicationMessage
+                    {
+                        Topic = topic,
                             Payload = memoryStream.GetBuffer()
-                        });
+                    });
 
-
-                    if( _configuration.OutputAdditionalJSON )
+                    if (_configuration.OutputAdditionalJSON)
                     {
                         var JSONtopic = $"{_configuration.OutputTopicPrefix}/JSON/{timeSeriesId}";
-                        var dataPointAsJSON = JsonConvert.SerializeObject(dataPoint);
-                        await _mqttClient.PublishAsync(new MqttApplicationMessage 
+                        var dataPointAsJSON = JsonConvert.SerializeObject(dataPoint,
+                            new ProtobufGuidConverter(),
+                            new ProtobufTimestampConverter()
+                        );
+                        await _mqttClient.PublishAsync(new MqttApplicationMessage
                         {
                             Topic = JSONtopic,
-                            Payload = Encoding.UTF8.GetBytes(dataPointAsJSON)
+                                Payload = Encoding.UTF8.GetBytes(dataPointAsJSON)
                         });
                     }
                 }
